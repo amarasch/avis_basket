@@ -1,7 +1,7 @@
 /* ─── COSTANTI ─── */
-const MESI_KEYS  = ['settembre','ottobre','novembre','dicembre','gennaio','febbraio','marzo','aprile','maggio','giugno'];
-const MESI_SHORT = ['Set','Ott','Nov','Dic','Gen','Feb','Mar','Apr','Mag','Giu'];
-const MESI_JS    = [8, 9, 10, 11, 0, 1, 2, 3, 4, 5];
+const MESI_KEYS  = ['settembre','ottobre','novembre','dicembre','gennaio','febbraio','marzo','aprile','maggio'];
+const MESI_SHORT = ['Set','Ott','Nov','Dic','Gen','Feb','Mar','Apr','Mag'];
+const MESI_JS    = [8, 9, 10, 11, 0, 1, 2, 3, 4];
 const MESI_NOMI  = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
 
 const FREQ_IMPORTO   = { Lezione: 5, 'Metà mese': 20, Mensile: 35, Trimestrale: 95, Stagionale: 240 };
@@ -86,9 +86,12 @@ function calcDistribuzione(frequenza, dateStr, meseIdxOverride) {
         }
       }
       break;
-    case 'Stagionale':
-      MESI_KEYS.forEach(m => mesi[m] = 24);
+    case 'Stagionale': {
+      const base = parseFloat((240 / MESI_KEYS.length).toFixed(2));
+      const last = parseFloat((240 - base * (MESI_KEYS.length - 1)).toFixed(2));
+      MESI_KEYS.forEach((m, i) => { mesi[m] = i < MESI_KEYS.length - 1 ? base : last; });
       break;
+    }
   }
   return mesi;
 }
@@ -308,26 +311,34 @@ function savePayment(e) {
   const meseIdx         = meseRiferimento !== null ? meseRiferimento : undefined;
   const periodo         = getPeriodo(frequenza, dateStr, meseIdx);
 
-  const main    = loadMain();
-  const athlete = main.find(r => r.nomeRagazzo === nomeRagazzo);
+  const main = loadMain();
+  const idx  = main.findIndex(r => r.nomeRagazzo === nomeRagazzo);
 
-  main.unshift({
-    id:               uid(),
-    nomeRagazzo,
-    nome:             athlete?.nome || '',
-    cognome:          athlete?.cognome || '',
-    anno:             athlete?.anno || '',
-    gruppo:           athlete?.gruppo || '',
-    nomeGenitore:     athlete?.nomeGenitore || '',
-    cfGenitore:       athlete?.cfGenitore || '',
-    telefono:         athlete?.telefono || '',
-    dataPagamento:    dateStr,
-    frequenza,
-    meseRiferimento,
-    periodo,
-    tipoPagamento:    tipo,
-    iscrizione:       athlete?.iscrizione || false,
-  });
+  if (idx !== -1) {
+    main[idx].dataPagamento   = dateStr;
+    main[idx].frequenza       = frequenza;
+    main[idx].meseRiferimento = meseRiferimento;
+    main[idx].periodo         = periodo;
+    main[idx].tipoPagamento   = tipo;
+  } else {
+    main.unshift({
+      id:               uid(),
+      nomeRagazzo,
+      nome:             '',
+      cognome:          '',
+      anno:             '',
+      gruppo:           '',
+      nomeGenitore:     '',
+      cfGenitore:       '',
+      telefono:         '',
+      dataPagamento:    dateStr,
+      frequenza,
+      meseRiferimento,
+      periodo,
+      tipoPagamento:    tipo,
+      iscrizione:       false,
+    });
+  }
   saveMain(main);
 
   closeModal();
