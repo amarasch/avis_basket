@@ -53,6 +53,8 @@
         <thead>
           <tr>
             <th class="th-name" onclick="sortBy('nome')">Atleta <span class="sort-arrow">↕</span></th>
+            <th class="th-phone">Telefono</th>
+            <th class="th-gruppo" onclick="sortBy('gruppo')">Gruppo <span class="sort-arrow">↕</span></th>
             <th class="th-iscr" onclick="sortBy('iscrizione')">Iscrizione <small style="font-weight:400;text-transform:none">€30</small> <span class="sort-arrow">↕</span></th>
             <th class="th-mese">Set</th>
             <th class="th-mese">Ott</th>
@@ -113,6 +115,21 @@
           <div class="form-group">
             <label>Data Pagamento</label>
             <input type="date" id="f_dataPagamento" onchange="updatePreview()">
+          </div>
+          <div class="form-group" id="meseRifWrap" style="display:none">
+            <label>Mese di Riferimento</label>
+            <select id="f_meseRiferimento" onchange="updatePreview()">
+              <option value="0">Settembre</option>
+              <option value="1">Ottobre</option>
+              <option value="2">Novembre</option>
+              <option value="3">Dicembre</option>
+              <option value="4">Gennaio</option>
+              <option value="5">Febbraio</option>
+              <option value="6">Marzo</option>
+              <option value="7">Aprile</option>
+              <option value="8">Maggio</option>
+              <option value="9">Giugno</option>
+            </select>
           </div>
           <div class="form-group full">
             <label>Tipo di Pagamento</label>

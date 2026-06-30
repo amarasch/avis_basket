@@ -3,7 +3,7 @@ let records = JSON.parse(localStorage.getItem('avisBasketPagamenti') || '[]');
 let editingId = null;
 let deletingId = null;
 let inlineEditingId = null;
-let sortKey = 'nomeRagazzo';
+let sortKey = 'cognome';
 let sortAsc = true;
 
 function save() {
@@ -22,7 +22,9 @@ function getFiltered() {
 
   return records.filter(r => {
     const matchSearch = !search ||
-      (r.nomeRagazzo || '').toLowerCase().includes(search) ||
+      (r.cognome || '').toLowerCase().includes(search) ||
+      (r.nome || '').toLowerCase().includes(search) ||
+      (r.gruppo || '').toLowerCase().includes(search) ||
       (r.nomeGenitore || '').toLowerCase().includes(search) ||
       (r.cfGenitore || '').toLowerCase().includes(search) ||
       (r.periodo || '').toLowerCase().includes(search);
@@ -38,22 +40,26 @@ function getFiltered() {
   });
 }
 
-const FREQ_OPTIONS = ['Lezione', 'Metà mese', 'Mensile', 'Trimestrale', 'Stagionale'];
-const TIPO_OPTIONS = ['Contanti', 'Bonifico'];
+const FREQ_OPTIONS   = ['Lezione', 'Metà mese', 'Mensile', 'Trimestrale', 'Stagionale'];
+const TIPO_OPTIONS   = ['Contanti', 'Bonifico'];
+const GRUPPO_OPTIONS = ['Pulcini', 'Scoiattoli', 'Aquilotti', 'U13', 'U14', 'U15'];
 
 const freqClass = { Lezione: 'lezione', 'Metà mese': 'meta-mese', Mensile: 'mensile', Trimestrale: 'trimestrale', Stagionale: 'stagionale' };
 const tipoClass = { Contanti: 'contanti', Bonifico: 'bonifico' };
 
 function normalRow(r) {
-  const dataFmt  = r.dataPagamento ? new Date(r.dataPagamento + 'T00:00:00').toLocaleDateString('it-IT') : '—';
-  const fc = freqClass[r.frequenza] || '';
-  const tc = tipoClass[r.tipoPagamento] || '';
+  const dataFmt = r.dataPagamento ? new Date(r.dataPagamento + 'T00:00:00').toLocaleDateString('it-IT') : '—';
+  const fc   = freqClass[r.frequenza] || '';
+  const tc   = tipoClass[r.tipoPagamento] || '';
+  const gc   = r.gruppo ? r.gruppo.toLowerCase() : '';
   const iscr = r.iscrizione;
-  const tel = r.telefono
+  const tel  = r.telefono
     ? `<a class="tel-link" href="tel:${escHtml(r.telefono)}">${escHtml(r.telefono)}</a>`
     : '—';
   return `<tr data-id="${r.id}">
-    <td data-label="Nome Atleta"><span class="player-name">${escHtml(r.nomeRagazzo || '—')}</span></td>
+    <td data-label="Cognome"><span class="player-name">${escHtml(r.cognome || '—')}</span></td>
+    <td data-label="Nome">${escHtml(r.nome || '—')}</td>
+    <td data-label="Gruppo">${gc ? `<span class="badge badge-gruppo-${gc}">${escHtml(r.gruppo)}</span>` : '—'}</td>
     <td data-label="Anno">${escHtml(String(r.anno || '—'))}</td>
     <td data-label="Genitore">${escHtml(r.nomeGenitore || '—')}</td>
     <td data-label="Cod. Fiscale"><code class="cf-code">${escHtml(r.cfGenitore || '—')}</code></td>
@@ -75,15 +81,20 @@ function normalRow(r) {
 }
 
 function inlineRow(r) {
-  const freqOpts = FREQ_OPTIONS.map(o =>
+  const freqOpts   = FREQ_OPTIONS.map(o =>
     `<option value="${o}" ${r.frequenza === o ? 'selected' : ''}>${o}</option>`
   ).join('');
-  const tipoOpts = TIPO_OPTIONS.map(o =>
+  const tipoOpts   = TIPO_OPTIONS.map(o =>
     `<option value="${o}" ${r.tipoPagamento === o ? 'selected' : ''}>${o}</option>`
+  ).join('');
+  const gruppoOpts = GRUPPO_OPTIONS.map(o =>
+    `<option value="${o}" ${r.gruppo === o ? 'selected' : ''}>${o}</option>`
   ).join('');
 
   return `<tr class="row-editing" data-id="${r.id}">
-    <td><input class="inline-input" id="ie_nomeRagazzo" value="${escHtml(r.nomeRagazzo || '')}" placeholder="Nome atleta"></td>
+    <td><input class="inline-input" id="ie_cognome" value="${escHtml(r.cognome || '')}" placeholder="Cognome"></td>
+    <td><input class="inline-input" id="ie_nome" value="${escHtml(r.nome || '')}" placeholder="Nome"></td>
+    <td><select class="inline-select" id="ie_gruppo"><option value="">—</option>${gruppoOpts}</select></td>
     <td><input class="inline-input inline-short" id="ie_anno" type="number" value="${r.anno || ''}" min="2000" max="2099" placeholder="Anno"></td>
     <td><input class="inline-input" id="ie_nomeGenitore" value="${escHtml(r.nomeGenitore || '')}" placeholder="Nome genitore"></td>
     <td><input class="inline-input inline-cf" id="ie_cfGenitore" value="${escHtml(r.cfGenitore || '')}" maxlength="16" placeholder="Codice fiscale" oninput="this.value=this.value.toUpperCase()"></td>
@@ -150,10 +161,15 @@ function saveInline(id) {
   const idx = records.findIndex(r => r.id === id);
   if (idx === -1) return;
 
-  const iscEl = document.getElementById('ie_iscrizione');
+  const nome    = get('ie_nome');
+  const cognome = get('ie_cognome');
+  const iscEl   = document.getElementById('ie_iscrizione');
   records[idx] = {
     ...records[idx],
-    nomeRagazzo:   get('ie_nomeRagazzo'),
+    nome,
+    cognome,
+    nomeRagazzo:   [nome, cognome].filter(Boolean).join(' '),
+    gruppo:        get('ie_gruppo'),
     anno:          get('ie_anno'),
     nomeGenitore:  get('ie_nomeGenitore'),
     cfGenitore:    get('ie_cfGenitore').toUpperCase(),
@@ -192,7 +208,7 @@ function sortBy(key) {
   if (inlineEditingId) cancelInline();
   if (sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = true; }
   document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
-  const colIdx = { nomeRagazzo: 0, anno: 1, nomeGenitore: 2, dataPagamento: 5, frequenza: 6, tipoPagamento: 8, iscrizione: 9 };
+  const colIdx = { cognome: 0, nome: 1, gruppo: 2, anno: 3, nomeGenitore: 4, dataPagamento: 7, frequenza: 8, tipoPagamento: 10, iscrizione: 11 };
   const ths = document.querySelectorAll('thead th');
   if (colIdx[key] !== undefined && ths[colIdx[key]]) ths[colIdx[key]].classList.add('sorted');
   renderTable();
@@ -213,7 +229,7 @@ function openModal() {
   document.getElementById('f_anno').value          = new Date().getFullYear();
   document.getElementById('f_dataPagamento').value = new Date().toISOString().slice(0, 10);
   document.getElementById('overlay').classList.add('open');
-  setTimeout(() => document.getElementById('f_nomeRagazzo').focus(), 100);
+  setTimeout(() => document.getElementById('f_nome').focus(), 100);
 }
 
 function closeModal() {
@@ -224,9 +240,14 @@ function saveRecord(e) {
   e && e.preventDefault();
   const get = id => document.getElementById(id).value.trim();
 
+  const nome    = get('f_nome');
+  const cognome = get('f_cognome');
   const record = {
     id:            uid(),
-    nomeRagazzo:   get('f_nomeRagazzo'),
+    nome,
+    cognome,
+    nomeRagazzo:   [nome, cognome].filter(Boolean).join(' '),
+    gruppo:        get('f_gruppo'),
     anno:          get('f_anno'),
     nomeGenitore:  get('f_nomeGenitore'),
     cfGenitore:    get('f_cfGenitore').toUpperCase(),
@@ -307,9 +328,10 @@ function toast(msg, type = 'success') {
 function exportCSV() {
   const data = getFiltered();
   if (!data.length) { toast('Nessun dato da esportare', 'error'); return; }
-  const header = ['Nome Ragazzo', 'Anno', 'Nome Genitore', 'CF Genitore', 'Telefono', 'Data Pagamento', 'Frequenza', 'Periodo di Riferimento', 'Tipo di Pagamento', 'Iscrizione'];
+  const header = ['Cognome', 'Nome', 'Gruppo', 'Anno', 'Nome Genitore', 'CF Genitore', 'Telefono', 'Data Pagamento', 'Frequenza', 'Periodo di Riferimento', 'Tipo di Pagamento', 'Iscrizione'];
   const rows = data.map(r => [
-    r.nomeRagazzo, r.anno, r.nomeGenitore, r.cfGenitore, r.telefono || '',
+    r.cognome || '', r.nome || '', r.gruppo || '', r.anno,
+    r.nomeGenitore, r.cfGenitore, r.telefono || '',
     r.dataPagamento, r.frequenza, r.periodo, r.tipoPagamento,
     r.iscrizione ? 'Pagata' : 'Non pagata'
   ].map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';'));
@@ -458,6 +480,51 @@ function seedData() {
   save();
 }
 
+/* ─── MIGRAZIONE DATI ESISTENTI ─── */
+function migrateRecords() {
+  let changed = false;
+  records = records.map(r => {
+    if ((!r.nome || !r.cognome) && r.nomeRagazzo) {
+      const parts  = (r.nomeRagazzo || '').trim().split(/\s+/);
+      if (!r.nome)    { r.nome    = parts.shift() || ''; changed = true; }
+      else              parts.shift();
+      if (!r.cognome) { r.cognome = parts.join(' ');     changed = true; }
+    }
+    if (!('gruppo' in r)) { r.gruppo = ''; changed = true; }
+    return r;
+  });
+  if (changed) save();
+}
+
+/* ─── RIPRISTINO ATLETI MANCANTI ─── */
+function patchMissingAthletes() {
+  const REQUIRED = [
+    { id: 'seed004', nome: 'Alba',    cognome: 'Alloggio', nomeRagazzo: 'Alba Alloggio',    anno: '2021' },
+    { id: 'seed074', nome: 'Michele', cognome: 'Muciaccia', nomeRagazzo: 'Michele Muciaccia', anno: '2012' },
+  ];
+  let changed = false;
+  for (const a of REQUIRED) {
+    const exists = records.some(r =>
+      r.nomeRagazzo === a.nomeRagazzo ||
+      (r.nome === a.nome && r.cognome === a.cognome)
+    );
+    if (!exists) {
+      records.push({
+        id: a.id,
+        nome: a.nome, cognome: a.cognome, nomeRagazzo: a.nomeRagazzo,
+        anno: a.anno, gruppo: '',
+        nomeGenitore: '', cfGenitore: '', telefono: '',
+        dataPagamento: '', frequenza: '', periodo: '', tipoPagamento: '',
+        iscrizione: false,
+      });
+      changed = true;
+    }
+  }
+  if (changed) save();
+}
+
 /* ─── INIT ─── */
 seedData();
+migrateRecords();
+patchMissingAthletes();
 renderTable();

@@ -34,9 +34,11 @@ function buildAthleteData() {
     if (!map.has(r.nomeRagazzo)) {
       map.set(r.nomeRagazzo, {
         anno:         r.anno || '',
+        gruppo:       r.gruppo || '',
         iscrizione:   false,
         nomeGenitore: '',
         telefono:     '',
+        hasPayments:  false,
         mesi:         blankMesi()
       });
     }
@@ -44,10 +46,13 @@ function buildAthleteData() {
     if (r.iscrizione)              entry.iscrizione   = true;
     if (r.nomeGenitore)            entry.nomeGenitore = r.nomeGenitore;
     if (r.telefono)                entry.telefono     = r.telefono;
+    if (r.gruppo && !entry.gruppo) entry.gruppo       = r.gruppo;
     if (!entry.anno && r.anno)     entry.anno         = r.anno;
-    // Accumula distribuzione mensile
     if (r.frequenza && r.dataPagamento) {
-      const dist = calcDistribuzione(r.frequenza, r.dataPagamento);
+      entry.hasPayments = true;
+      const meseIdx = (r.meseRiferimento !== null && r.meseRiferimento !== undefined)
+        ? r.meseRiferimento : undefined;
+      const dist = calcDistribuzione(r.frequenza, r.dataPagamento, meseIdx);
       MESI_KEYS.forEach(k => {
         entry.mesi[k] = parseFloat(((entry.mesi[k] || 0) + (dist[k] || 0)).toFixed(2));
       });
@@ -64,9 +69,9 @@ function getMeseIdx(dateStr) {
   return idx >= 0 ? idx : 0;
 }
 
-function calcDistribuzione(frequenza, dateStr) {
+function calcDistribuzione(frequenza, dateStr, meseIdxOverride) {
   const mesi = blankMesi();
-  const si   = getMeseIdx(dateStr);
+  const si   = meseIdxOverride !== undefined ? meseIdxOverride : getMeseIdx(dateStr);
   switch (frequenza) {
     case 'Lezione':    mesi[MESI_KEYS[si]] = 5;  break;
     case 'Metà mese': mesi[MESI_KEYS[si]] = 20; break;
@@ -89,24 +94,23 @@ function calcDistribuzione(frequenza, dateStr) {
 }
 
 /* ─── PERIODO ─── */
-function getPeriodo(frequenza, dateStr) {
-  if (!dateStr) return '';
-  const d    = new Date(dateStr + 'T00:00:00');
-  const m    = d.getMonth();
-  const y    = d.getFullYear();
-  const nome = MESI_NOMI[m];
-  const cap  = s => s.charAt(0).toUpperCase() + s.slice(1);
+function getPeriodo(frequenza, dateStr, meseIdxOverride) {
+  if (!dateStr && meseIdxOverride === undefined) return '';
+  const si     = meseIdxOverride !== undefined ? meseIdxOverride : getMeseIdx(dateStr);
+  const meseJS = MESI_JS[si];
+  const y      = dateStr ? new Date(dateStr + 'T00:00:00').getFullYear() : new Date().getFullYear();
+  const nome   = MESI_NOMI[meseJS];
+  const cap    = s => s.charAt(0).toUpperCase() + s.slice(1);
   switch (frequenza) {
     case 'Lezione':
     case 'Metà mese':
     case 'Mensile':      return `${cap(nome)} ${y}`;
     case 'Trimestrale': {
-      const si   = getMeseIdx(dateStr);
-      const ei   = Math.min(si + 2, 9);
+      const ei = Math.min(si + 2, 9);
       return `${cap(nome)} – ${cap(MESI_NOMI[MESI_JS[ei]])} ${y}`;
     }
     case 'Stagionale': {
-      const sy = m >= 8 ? y : y - 1;
+      const sy = meseJS >= 8 ? y : y - 1;
       return `Stagionale ${sy}-${String(sy + 1).slice(2)}`;
     }
     default: return '';
@@ -136,7 +140,7 @@ function toggleIscrizione(nomeRagazzo) {
 function sortBy(key) {
   if (sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = true; }
   document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
-  const map = { nome: 0, iscrizione: 1, totale: 12 };
+  const map = { nome: 0, iscrizione: 3, gruppo: 2, totale: 14 };
   if (map[key] !== undefined) {
     const ths = document.querySelectorAll('thead th');
     if (ths[map[key]]) ths[map[key]].classList.add('sorted');
@@ -160,9 +164,10 @@ function renderTable() {
 
   athletes.sort((a, b) => {
     let va, vb;
-    if (sortKey === 'nome')            { va = a.nomeRagazzo; vb = b.nomeRagazzo; }
+    if      (sortKey === 'nome')       { va = a.nomeRagazzo; vb = b.nomeRagazzo; }
     else if (sortKey === 'totale')     { va = a.totale;      vb = b.totale; }
     else if (sortKey === 'iscrizione') { va = a.iscrizione ? 1 : 0; vb = b.iscrizione ? 1 : 0; }
+    else if (sortKey === 'gruppo')     { va = a.gruppo || ''; vb = b.gruppo || ''; }
     else                               { va = a.nomeRagazzo; vb = b.nomeRagazzo; }
     if (typeof va === 'string') return sortAsc ? va.localeCompare(vb, 'it') : vb.localeCompare(va, 'it');
     return sortAsc ? va - vb : vb - va;
@@ -185,18 +190,26 @@ function renderTable() {
   const colTotals   = blankMesi();
   let totIscrizioni = 0, totGrand = 0;
 
-  tbody.innerHTML = athletes.map(({ nomeRagazzo, iscrizione, mesi, totale }) => {
+  tbody.innerHTML = athletes.map(({ nomeRagazzo, telefono, gruppo, iscrizione, mesi, totale, hasPayments }) => {
     const iscAmt = iscrizione ? ISCRIZIONE_QUOTA : 0;
     totIscrizioni += iscAmt;
     MESI_KEYS.forEach(k => colTotals[k] += (mesi[k] || 0));
     totGrand += totale;
+    const telHtml   = telefono
+      ? `<a class="tel-link" href="tel:${escHtml(telefono)}">${escHtml(telefono)}</a>`
+      : '<span class="cell-empty">—</span>';
+    const gruppoHtml = gruppo
+      ? `<span class="badge badge-gruppo-${gruppo.toLowerCase()}">${escHtml(gruppo)}</span>`
+      : '<span class="cell-empty">—</span>';
     return `<tr>
       <td class="col-name" data-label="Atleta">
         <span class="player-name">${escHtml(nomeRagazzo)}</span>
-        <button class="btn-edit-athlete" onclick="openAthleteModal('${escHtml(nomeRagazzo)}')" title="Modifica pagamenti">
+        ${hasPayments ? `<button class="btn-edit-athlete" onclick="openAthleteModal('${escHtml(nomeRagazzo)}')" title="Modifica pagamenti">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
+        </button>` : ''}
       </td>
+      <td data-label="Telefono">${telHtml}</td>
+      <td data-label="Gruppo">${gruppoHtml}</td>
       <td data-label="Iscrizione">
         <button class="toggle-iscrizione ${iscrizione ? 'is-paid' : 'is-unpaid'}"
                 onclick="toggleIscrizione('${escHtml(nomeRagazzo)}')"
@@ -211,6 +224,8 @@ function renderTable() {
 
   tfoot.innerHTML = `<tr class="footer-row">
     <td><strong>Totali</strong></td>
+    <td></td>
+    <td></td>
     <td data-label="Iscrizione"><strong>${totIscrizioni > 0 ? fmtPlain(totIscrizioni) : '—'}</strong></td>
     ${MESI_KEYS.map((k, i) => `<td class="cell-mese" data-label="${MESI_SHORT[i]}"><strong>${colTotals[k] > 0 ? fmtPlain(colTotals[k]) : '—'}</strong></td>`).join('')}
     <td class="cell-totale" data-label="Totale"><strong>${fmtPlain(totGrand)}</strong></td>
@@ -228,7 +243,12 @@ function openModal() {
 
   document.getElementById('payForm').reset();
   document.getElementById('f_dataPagamento').value = new Date().toISOString().slice(0, 10);
-  document.getElementById('previewWrap').style.display = 'none';
+  document.getElementById('previewWrap').style.display  = 'none';
+  document.getElementById('meseRifWrap').style.display  = 'none';
+  // default mese riferimento = mese scolastico corrente
+  const todayM    = new Date().getMonth();
+  const schoolIdx = MESI_JS.indexOf(todayM);
+  document.getElementById('f_meseRiferimento').value = schoolIdx >= 0 ? schoolIdx : 0;
   document.getElementById('overlay').classList.add('open');
   setTimeout(() => document.getElementById('f_nomeRagazzo').focus(), 100);
 }
@@ -243,11 +263,20 @@ function updatePreview() {
   const dateStr   = document.getElementById('f_dataPagamento').value;
   const wrap      = document.getElementById('previewWrap');
   const preview   = document.getElementById('mesiPreview');
+  const meseWrap  = document.getElementById('meseRifWrap');
+
+  const needsMese = ['Mensile', 'Metà mese', 'Trimestrale'].includes(frequenza);
+  meseWrap.style.display = needsMese ? '' : 'none';
 
   if (!frequenza) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
 
-  const dist    = calcDistribuzione(frequenza, dateStr);
+  let meseIdxOverride;
+  if (needsMese) {
+    meseIdxOverride = parseInt(document.getElementById('f_meseRiferimento').value);
+  }
+
+  const dist    = calcDistribuzione(frequenza, dateStr, meseIdxOverride);
   const importo = FREQ_IMPORTO[frequenza];
 
   preview.innerHTML = MESI_KEYS.map((k, i) => {
@@ -272,28 +301,39 @@ function savePayment(e) {
   if (!nomeRagazzo) { toast('Seleziona un atleta', 'error'); return; }
   if (!frequenza)   { toast('Seleziona la frequenza', 'error'); return; }
 
+  const needsMese       = ['Mensile', 'Metà mese', 'Trimestrale'].includes(frequenza);
+  const meseRiferimento = needsMese
+    ? parseInt(document.getElementById('f_meseRiferimento').value)
+    : null;
+  const meseIdx         = meseRiferimento !== null ? meseRiferimento : undefined;
+  const periodo         = getPeriodo(frequenza, dateStr, meseIdx);
+
   const main    = loadMain();
   const athlete = main.find(r => r.nomeRagazzo === nomeRagazzo);
 
   main.unshift({
-    id:            uid(),
+    id:               uid(),
     nomeRagazzo,
-    anno:          athlete?.anno || '',
-    nomeGenitore:  athlete?.nomeGenitore || '',
-    cfGenitore:    athlete?.cfGenitore || '',
-    telefono:      athlete?.telefono || '',
-    dataPagamento: dateStr,
+    nome:             athlete?.nome || '',
+    cognome:          athlete?.cognome || '',
+    anno:             athlete?.anno || '',
+    gruppo:           athlete?.gruppo || '',
+    nomeGenitore:     athlete?.nomeGenitore || '',
+    cfGenitore:       athlete?.cfGenitore || '',
+    telefono:         athlete?.telefono || '',
+    dataPagamento:    dateStr,
     frequenza,
-    periodo:       getPeriodo(frequenza, dateStr),
-    tipoPagamento: tipo,
-    iscrizione:    athlete?.iscrizione || false,
+    meseRiferimento,
+    periodo,
+    tipoPagamento:    tipo,
+    iscrizione:       athlete?.iscrizione || false,
   });
   saveMain(main);
 
   closeModal();
   renderTable();
   toast(`Pagamento di ${nomeRagazzo} salvato ✓`, 'success');
-  openWhatsApp(nomeRagazzo, frequenza, dateStr, tipo, getPeriodo(frequenza, dateStr));
+  openWhatsApp(nomeRagazzo, frequenza, dateStr, tipo, periodo);
 }
 
 function openWhatsApp(nomeRagazzo, frequenza, dateStr, tipo, periodo) {
@@ -342,12 +382,13 @@ function exportCSV() {
 
   if (!athletes.length) { toast('Nessun dato da esportare', 'error'); return; }
 
-  const header = ['Atleta', 'Iscrizione', ...MESI_SHORT, 'Totale'];
+  const header = ['Atleta', 'Telefono', 'Iscrizione', ...MESI_SHORT, 'Totale'];
   const rows   = athletes.map(a => {
     const meseSum = MESI_KEYS.reduce((s, k) => s + (a.mesi[k] || 0), 0);
     const totale  = (a.iscrizione ? ISCRIZIONE_QUOTA : 0) + meseSum;
     return [
       a.nomeRagazzo,
+      a.telefono || '',
       a.iscrizione ? 'Pagata' : 'Non pagata',
       ...MESI_KEYS.map(k => a.mesi[k] > 0 ? a.mesi[k].toFixed(2).replace('.', ',') : '0'),
       totale.toFixed(2).replace('.', ',')
@@ -388,7 +429,7 @@ function _refreshMpCount() {
 }
 
 function renderAthletePayments() {
-  const payments = loadMain().filter(r => r.nomeRagazzo === _mpNome);
+  const payments = loadMain().filter(r => r.nomeRagazzo === _mpNome && r.frequenza && r.dataPagamento);
   const body     = document.getElementById('mpBody');
 
   if (!payments.length) {

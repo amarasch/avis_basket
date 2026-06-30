@@ -27,8 +27,20 @@ function initFirebaseSync() {
       if (typeof records !== 'undefined') {
         try { records = JSON.parse(remoteData); } catch (_) {}
       }
+      // Riesegui migrazione e patch dopo ogni sync Firebase
+      if (typeof migrateRecords === 'function') migrateRecords();
+      if (typeof patchMissingAthletes === 'function') patchMissingAthletes();
       if (typeof renderTable === 'function') renderTable();
-      setTimeout(() => { _syncInProgress = false; }, 100);
+      setTimeout(() => {
+        _syncInProgress = false;
+        // Se il patch ha modificato i dati rispetto a quanto arrivato da Firebase, carica la versione corretta
+        const localAfterPatch = localStorage.getItem('avisBasketPagamenti');
+        if (localAfterPatch && localAfterPatch !== remoteData) {
+          _db.collection('avisBasket').doc('pagamenti')
+            .set({ data: localAfterPatch, aggiornato: firebase.firestore.FieldValue.serverTimestamp() })
+            .catch(err => console.error('[Firebase] patch-upload error:', err));
+        }
+      }, 150);
     }, err => console.error('[Firebase] snapshot error:', err));
 
     console.log('%c[Firebase] ✓ Connesso', 'color:#EAB308;font-weight:bold');

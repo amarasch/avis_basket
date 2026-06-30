@@ -67,7 +67,9 @@
       <table id="mainTable">
         <thead>
           <tr>
-            <th onclick="sortBy('nomeRagazzo')">Atleta <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('cognome')">Cognome <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('nome')">Nome <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('gruppo')">Gruppo <span class="sort-arrow">↕</span></th>
             <th onclick="sortBy('anno')">Anno <span class="sort-arrow">↕</span></th>
             <th onclick="sortBy('nomeGenitore')">Genitore <span class="sort-arrow">↕</span></th>
             <th>CF Genitore</th>
@@ -106,8 +108,24 @@
       <form id="payForm" onsubmit="saveRecord(event)">
         <div class="form-grid">
           <div class="form-group">
-            <label>Nome Ragazzo / Ragazza</label>
-            <input type="text" id="f_nomeRagazzo" placeholder="Es. Mario Rossi">
+            <label>Nome</label>
+            <input type="text" id="f_nome" placeholder="Es. Mario">
+          </div>
+          <div class="form-group">
+            <label>Cognome</label>
+            <input type="text" id="f_cognome" placeholder="Es. Rossi">
+          </div>
+          <div class="form-group">
+            <label>Gruppo</label>
+            <select id="f_gruppo">
+              <option value="">Seleziona…</option>
+              <option value="Pulcini">Pulcini</option>
+              <option value="Scoiattoli">Scoiattoli</option>
+              <option value="Aquilotti">Aquilotti</option>
+              <option value="U13">U13</option>
+              <option value="U14">U14</option>
+              <option value="U15">U15</option>
+            </select>
           </div>
           <div class="form-group">
             <label>Anno</label>
