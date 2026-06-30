@@ -563,9 +563,16 @@ function cancelDeletePayment() {
 }
 
 function confirmDeletePayment(id) {
-  const main    = loadMain();
-  const newMain = main.filter(r => r.id !== id);
-  saveMain(newMain);
+  const main = loadMain();
+  const idx  = main.findIndex(r => r.id === id);
+  if (idx !== -1) {
+    main[idx].dataPagamento   = '';
+    main[idx].frequenza       = '';
+    main[idx].meseRiferimento = null;
+    main[idx].periodo         = '';
+    main[idx].tipoPagamento   = '';
+  }
+  saveMain(main);
   _confirmId = null;
   _refreshMpCount();
   renderAthletePayments();

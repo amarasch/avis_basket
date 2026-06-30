@@ -499,8 +499,9 @@ function migrateRecords() {
 /* ─── RIPRISTINO ATLETI MANCANTI ─── */
 function patchMissingAthletes() {
   const REQUIRED = [
-    { id: 'seed004', nome: 'Alba',    cognome: 'Alloggio', nomeRagazzo: 'Alba Alloggio',    anno: '2021' },
-    { id: 'seed074', nome: 'Michele', cognome: 'Muciaccia', nomeRagazzo: 'Michele Muciaccia', anno: '2012' },
+    { id: 'seed004', nome: 'Alba',       cognome: 'Alloggio',  nomeRagazzo: 'Alba Alloggio',       anno: '2021' },
+    { id: 'seed074', nome: 'Michele',    cognome: 'Muciaccia', nomeRagazzo: 'Michele Muciaccia',    anno: '2012' },
+    { id: 'seed081', nome: 'Alessandro', cognome: 'Pascalone', nomeRagazzo: 'Alessandro Pascalone', anno: '2012' },
   ];
   let changed = false;
   for (const a of REQUIRED) {
